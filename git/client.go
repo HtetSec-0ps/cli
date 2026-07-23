@@ -277,6 +277,17 @@ func (c *Client) Worktrees(ctx context.Context) ([]Worktree, error) {
 	return parseWorktrees(out), nil
 }
 
+// WorktreeRemove removes the worktree at the given path via
+// `git worktree remove <path>`.
+func (c *Client) WorktreeRemove(ctx context.Context, path string) error {
+	cmd, err := c.Command(ctx, "worktree", "remove", path)
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	return err
+}
+
 func (c *Client) Config(ctx context.Context, name string) (string, error) {
 	args := []string{"config", name}
 	cmd, err := c.Command(ctx, args...)
