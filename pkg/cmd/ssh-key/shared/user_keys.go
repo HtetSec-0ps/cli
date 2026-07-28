@@ -1,14 +1,11 @@
 package shared
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
 const (
@@ -29,9 +26,9 @@ func UserKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error
 	if userHandle != "" {
 		resource = fmt.Sprintf("users/%s/keys", userHandle)
 	}
-	url := fmt.Sprintf("%s%s?per_page=%d", ghinstance.RESTPrefix(host), resource, 100)
+	path := fmt.Sprintf("%s?per_page=%d", resource, 100)
 
-	keys, err := getUserKeys(httpClient, url)
+	keys, err := getUserKeys(httpClient, host, path)
 
 	if err != nil {
 		return nil, err
@@ -49,9 +46,9 @@ func UserSigningKeys(httpClient *http.Client, host, userHandle string) ([]sshKey
 	if userHandle != "" {
 		resource = fmt.Sprintf("users/%s/ssh_signing_keys", userHandle)
 	}
-	url := fmt.Sprintf("%s%s?per_page=%d", ghinstance.RESTPrefix(host), resource, 100)
+	path := fmt.Sprintf("%s?per_page=%d", resource, 100)
 
-	keys, err := getUserKeys(httpClient, url)
+	keys, err := getUserKeys(httpClient, host, path)
 
 	if err != nil {
 		return nil, err
@@ -64,29 +61,12 @@ func UserSigningKeys(httpClient *http.Client, host, userHandle string) ([]sshKey
 	return keys, nil
 }
 
-func getUserKeys(httpClient *http.Client, url string) ([]sshKey, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
+func getUserKeys(httpClient *http.Client, hostname, path string) ([]sshKey, error) {
 	var keys []sshKey
-	err = json.Unmarshal(b, &keys)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err := api.NewClientFromHTTP(httpClient).REST(hostname, http.MethodGet, path, nil, &keys)
 	if err != nil {
 		return nil, err
 	}
