@@ -1,16 +1,13 @@
 package list
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
 var errScopes = errors.New("insufficient OAuth scopes")
@@ -42,32 +39,18 @@ func userKeys(httpClient *http.Client, host, userHandle string) ([]gpgKey, error
 	if userHandle != "" {
 		resource = fmt.Sprintf("users/%s/gpg_keys", userHandle)
 	}
-	url := fmt.Sprintf("%s%s?per_page=%d", ghinstance.RESTPrefix(host), resource, 100)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
 
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		return nil, errScopes
-	} else if resp.StatusCode > 299 {
-		return nil, api.HandleHTTPError(resp)
-	}
-
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
+	path := fmt.Sprintf("%s?per_page=%d", resource, 100)
 	var keys []gpgKey
-	err = json.Unmarshal(b, &keys)
+	// TODO(api-client-rollout)
+	// This line of code is part of a mechanical roll out of the api client.
+	// As a follow up, consider whether the api client can be injected to this call site, rather than constructed
+	err := api.NewClientFromHTTP(httpClient).REST(host, "GET", path, nil, &keys)
 	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
+			return nil, errScopes
+		}
 		return nil, err
 	}
 
