@@ -161,6 +161,10 @@ func (s searcher) Repositories(query Query) (RepositoriesResult, error) {
 func (s searcher) Issues(query Query) (IssuesResult, error) {
 	result := IssuesResult{}
 
+	// Semantic and hybrid searches use a separate, smaller rate-limit bucket and
+	// are relevance-ranked, so bound fetching to a single page.
+	singlePage := query.SearchType == "semantic" || query.SearchType == "hybrid"
+
 	numItemsToRetrieve := query.Limit
 	query.Limit = min(numItemsToRetrieve, maxPerPage)
 	query.Page = 1
@@ -176,6 +180,10 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
 		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
+
+		if singlePage {
+			break
+		}
 
 		query.Page = nextPage(link)
 		if query.Page == 0 {
@@ -222,6 +230,19 @@ func (s searcher) search(query Query, result interface{}) (string, error) {
 				// Advanced syntax should be explicitly enabled
 				qs.Set("advanced_search", "true")
 			}
+		}
+
+		switch query.SearchType {
+		case "semantic":
+			if !features.SemanticSearch {
+				return "", fmt.Errorf("semantic search is not supported on this host: %s", s.host)
+			}
+			qs.Set("search_type", query.SearchType)
+		case "hybrid":
+			if !features.HybridSearch {
+				return "", fmt.Errorf("hybrid search is not supported on this host: %s", s.host)
+			}
+			qs.Set("search_type", query.SearchType)
 		}
 	} else {
 		qs.Set("q", query.StandardSearchString())
