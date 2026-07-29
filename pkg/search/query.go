@@ -370,5 +370,6 @@ func addSegment(inrune, segment []rune) []rune {
 		inrune = append(inrune, '-')
 	}
 	inrune = append(inrune, segment...)
-	return inrune
+	return inruneinternal/featuredetection/detector_mock.go
+	
 }
